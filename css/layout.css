@@ -1,0 +1,23 @@
+.buttonPanel {
+	margin-top: 20px;
+}
+
+.mainDiv {
+	width: 50%;
+	margin: 0px auto;
+	text-align: center;
+}
+
+#btc_pic {
+	width: 150px;
+	height: 150px;
+}
+
+.donations button {
+	margin-left: 20px;
+	margin-bottom: 20px;
+}
+
+.mainImage {
+	width: 40%;
+}

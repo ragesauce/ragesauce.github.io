@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Kyle's Webspace</title>
+
+    <!-- CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/layout.css" rel="stylesheet">
+
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+      <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="container-fluid">
+    <div class="mainDiv">
+      <h1>I'm Kyle<small> and this is my webspace.</small></h1>
+      <img class="mainImage" src="img/530241625.gif"/>
+      
+      <div class="buttonPanel">
+        <div class="donations">
+		  <button class="btn btn-danger" type="button" data-toggle="modal" data-target="#pkModal">Public GPG Key</button>
+		  <button class="btn btn-success" type="button" data-toggle="modal" data-target="#contactModal">Contact</button>
+        </div>
+      </div>
+    </div>
+  
+    <!-- pgp modal -->
+    <div class="modal fade" id="pkModal" tabindex="-1" role="dialog" aria-labelledby="pkModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h4 class="modal-title" id="pkModalLabel">Public Key:</h4>
+          </div>
+        <div class="modal-body">
+<small><pre>ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0+UkKyyACtpJNJMudOlXlAAcPc1iXMvONOgqD+5GLP2jxY+yZ5ThaJcGAvKYOaKsh6pDPweN6FYtDPZCnyqzohMPvnW89WYGG/NVxYgeHZf/O+nnULwUZ4mnLSPayS4psP1tZ95VcAQ2ldlpMQuiqPZ4syf/Nl4oAKwN04bvJ1VsxvrjVjIaG1l/9pda8E1AVTbLMfsyn70FPv/VktUw8rjjDyg9QJGg7bfPXlQslFOdvY9msfk3TmP769J7qQQPnO7KWrXBmRPI+rxYt9BQciIeOPdPZOcg8Ml8uhdtMRex8MQJY1klDm2cQUea6qu/ikqDrggSWxL0YDrJFDa7p ragesauce@flavortown</pre></small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- contact modal -->
+    <div class="modal fade" id="contactModal" tabindex="-1" role="dialog" aria-labelledby="contactModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+          </div>
+          <div class="modal-body">
+		    <code>kwikness[izat]gmail[d0tc0m]</code>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+    <!-- skripz -->
+    <script src="http://code.jquery.com/jquery.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+  </body>
+</html>
