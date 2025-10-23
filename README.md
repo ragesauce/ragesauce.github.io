@@ -1,4 +1,4 @@
 site
 ====
 
-Just a repo for my site at kyleswebspace.com
+Just a repo for my site
