@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<!-- saved from url=(0049)file:///C:/Users/Coors/Downloads/economy_sim.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Allocation Bench</title>
+<style>
+  :root{
+    --bg:#0e1116;
+    --panel:#151a22;
+    --panel-2:#1b212b;
+    --line:#2a323d;
+    --ink:#e6e9ee;
+    --ink-dim:#8b97a7;
+    --ink-faint:#5d6775;
+    --market:#e0a73c;     /* gold — private allocation */
+    --plan:#d3454f;       /* crimson — central allocation */
+    --good:#5bbf8a;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{padding:22px;max-width:1180px;margin:0 auto}
+  a{color:var(--market)}
+
+  header{margin-bottom:18px;border-bottom:1px solid var(--line);padding-bottom:14px}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-faint)}
+  h1{margin:.25em 0 .15em;font-size:26px;font-weight:650;letter-spacing:-.01em}
+  .sub{color:var(--ink-dim);font-size:13.5px;max-width:72ch;line-height:1.5}
+
+  .grid{display:grid;grid-template-columns:minmax(320px,1fr) 360px;gap:18px;align-items:start}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .card h2{margin:0 0 2px;font-size:12px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);font-weight:600}
+  .card .hint{font-size:11.5px;color:var(--ink-faint);margin:0 0 12px;line-height:1.45}
+
+  canvas{display:block;width:100%;image-rendering:pixelated;border-radius:6px;background:#0a0d12}
+
+  /* metric readouts */
+  .readouts{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:14px}
+  .metric{background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:9px 10px}
+  .metric .label{font-size:10px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
+  .metric .val{font-family:var(--mono);font-size:19px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums}
+
+  /* controls */
+  .knob{margin-bottom:15px}
+  .knob .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+  .knob .name{font-size:13px;font-weight:550}
+  .knob .num{font-family:var(--mono);font-size:12.5px;color:var(--market);font-variant-numeric:tabular-nums}
+  .knob .desc{font-size:11px;color:var(--ink-faint);line-height:1.4;margin-top:4px}
+  input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:3px;background:var(--line);outline:none;margin:2px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--ink);border:2px solid var(--bg);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--ink);border:2px solid var(--bg);cursor:pointer;border-width:2px}
+  input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(224,167,60,.4)}
+
+  /* the regime spectrum slider gets the gold->crimson track */
+  #redis{background:linear-gradient(90deg,var(--market),#7a5f6a 50%,var(--plan))}
+  #redis::-webkit-slider-thumb{background:var(--ink);width:17px;height:17px}
+
+  .spectrum-labels{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);margin-top:2px}
+
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  button{font-family:var(--sans);font-size:12.5px;font-weight:550;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:8px 13px;cursor:pointer;transition:border-color .12s,background .12s}
+  button:hover{border-color:var(--ink-faint)}
+  button:focus-visible{outline:2px solid var(--market);outline-offset:1px}
+  button.primary{background:var(--market);color:#1a1206;border-color:var(--market)}
+  button.primary[data-running="true"]{background:var(--panel-2);color:var(--ink);border-color:var(--line)}
+
+  /* frontier / verdict */
+  .verdict{font-size:13.5px;line-height:1.55;color:var(--ink);margin-top:2px}
+  .verdict b{color:var(--market)}
+  .tag{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:5px;border:1px solid;display:inline-block}
+  .tag.mkt{color:var(--market);border-color:var(--market)}
+  .tag.mix{color:#c9a877;border-color:#7a6a4a}
+  .tag.plan{color:var(--plan);border-color:var(--plan)}
+
+  footer{margin-top:20px;color:var(--ink-faint);font-size:11.5px;line-height:1.55;border-top:1px solid var(--line);padding-top:13px}
+  code{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim)}
+  .legend{display:flex;gap:14px;font-size:11px;color:var(--ink-dim);margin-top:8px;flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+</style>
+</head>
+<body>
+<header>
+  <div class="kicker">Allocation Bench · agent-based economy</div>
+  <h1>Who wins depends on what you assume</h1>
+  <p class="sub">A grid of agents harvest a regenerating resource. One dial sets how much output is privately kept versus centrally pooled — laissez-faire on the left, full central planning on the right. The four assumption knobs are where the real argument lives: turn them, and watch the welfare-maximizing allocation slide from one pole to the other. The verdict isn't in the model. It's in the priors you feed it.</p>
+</header>
+
+<div class="grid">
+  <!-- LEFT: world + live metrics -->
+  <div class="card">
+    <h2>The world</h2>
+    <p class="hint">Each square is an agent, brightness = accumulated wealth. The terrain has two fertile peaks. You're watching inequality (or its absence) emerge from local rules — nobody designed the distribution.</p>
+    <canvas id="world" width="320" height="320" aria-label="agent grid"></canvas>
+    <div class="legend">
+      <span><i class="sw" style="background:#222932"></i>poor</span>
+      <span><i class="sw" style="background:#7a5a1e"></i>middle</span>
+      <span><i class="sw" style="background:#e0a73c"></i>rich</span>
+      <span><i class="sw" style="background:#3a1417"></i>perished</span>
+    </div>
+    <div class="readouts">
+      <div class="metric"><div class="label">Total output</div><div class="val" id="m-out">1279</div></div>
+      <div class="metric"><div class="label">Median wealth</div><div class="val" id="m-med">4.0</div></div>
+      <div class="metric"><div class="label">Gini (inequality)</div><div class="val" id="m-gini">0.170</div></div>
+      <div class="metric"><div class="label">Survivors</div><div class="val" id="m-surv">320 / 320</div></div>
+    </div>
+    <div class="metric" style="margin-top:9px">
+      <div class="label">Aggregate welfare · Atkinson EDE at your η</div>
+      <div class="val" id="m-welf" style="color:var(--good)">3.77</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: controls -->
+  <div class="card">
+    <h2>The regime dial</h2>
+    <div class="knob">
+      <div class="row"><span class="name">Redistribution&nbsp;<span class="num" id="v-redis">0.00</span></span></div>
+      <input type="range" id="redis" min="0" max="1" step="0.01" value="0.30">
+      <div class="spectrum-labels"><span>laissez-faire</span><span>mixed</span><span>central plan</span></div>
+      <div class="desc">Share of each harvest pooled and handed back out evenly.</div>
+    </div>
+
+    <h2 style="margin-top:18px">The assumptions that decide it</h2>
+    <p class="hint">These are the things real systems actually differ on — and the things hardest to measure. That's the point.</p>
+
+    <div class="knob">
+      <div class="row"><span class="name">Incentive elasticity</span><span class="num" id="v-inc">0.45</span></div>
+      <input type="range" id="inc" min="0" max="1" step="0.01" value="0.45">
+      <div class="desc">How much people slack off when they don't keep what they make. High → pooling shrinks the pie. <i>Markets' case.</i></div>
+    </div>
+
+    <div class="knob">
+      <div class="row"><span class="name">Planner inefficiency <span style="color:var(--ink-faint)">(Hayek)</span></span><span class="num" id="v-plan">0.35</span></div>
+      <input type="range" id="plan" min="0" max="1" step="0.01" value="0.35">
+      <div class="desc">Waste from a central allocator lacking the local knowledge a price carries. High → planning leaks. <i>Markets' case.</i></div>
+    </div>
+
+    <div class="knob">
+      <div class="row"><span class="name">Inequality aversion <span style="color:var(--ink-faint)">(η)</span></span><span class="num" id="v-eta">1.20</span></div>
+      <input type="range" id="eta" min="0" max="3" step="0.05" value="1.20">
+      <div class="desc">Curvature of welfare in wealth — the objective function itself. 0 → only total output counts. High → a dollar to the poor counts far more. <i>Redistribution's case.</i></div>
+    </div>
+
+    <div class="knob">
+      <div class="row"><span class="name">Shock severity</span><span class="num" id="v-shock">0.30</span></div>
+      <input type="range" id="shock" min="0" max="0.9" step="0.01" value="0.30">
+      <div class="desc">Droughts that wipe out the unbuffered. Pooling acts as insurance. <i>Planning's genuine case.</i></div>
+    </div>
+
+    <div class="btns">
+      <button class="primary" id="run">Run</button>
+      <button id="step">Step</button>
+      <button id="reset">Reset world</button>
+      <button id="jump">Jump to optimum →</button>
+    </div>
+  </div>
+</div>
+
+<!-- FRONTIER: the verdict that moves -->
+<div class="card" style="margin-top:18px">
+  <h2>The frontier — welfare across every regime, given your assumptions</h2>
+  <p class="hint">A fast aggregate model (Atkinson social welfare over a lognormal distribution whose mean and spread follow the same four knobs) sweeps every redistribution level so you don't have to. The peak is the verdict. Move an assumption knob and watch the peak migrate. The grid above is the agent-based confirmation at your chosen point.</p>
+  <canvas id="frontier" width="900" height="240" aria-label="welfare versus redistribution"></canvas>
+  <p class="verdict" id="verdict">Given your assumptions, welfare peaks at <b>r = 0.56</b> &nbsp;<span class="tag mix">A mixed economy</span><br><span style="color:var(--ink-dim);font-size:12.5px">Markets generate the surplus; partial redistribution converts it into welfare faster than it suppresses output. The Nordic configuration, and where most of the parameter space lands.</span></p>
+</div>
+
+<footer>
+  <b style="color:var(--ink-dim)">How to read it.</b> Crank <code>incentive elasticity</code> and <code>planner inefficiency</code> → the peak slams left: markets win on every metric, exactly as the command-economy record shows. Now drop them and raise <code>η</code> and <code>shock severity</code> → the peak slides right toward pooling. Across most of the middle of the parameter space the optimum sits at a <i>mixed</i> economy — a market that generates the surplus, with redistribution converting surplus into satisfaction. No setting makes the model neutral; whichever pole "wins" was decided by the knobs, not discovered by the sim. That's the lesson, not a bug.<br><br>
+  <b style="color:var(--ink-dim)">Honesty note.</b> The frontier curve is an explicit welfare model (Atkinson EDE × incentive-and-Hayek pie shrinkage × shock-insurance term). The grid is a separate Sugarscape-style agent sim that should track it qualitatively, not to the decimal. Two views of the same forces — kept separate on purpose so you can see where they disagree.
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- math helpers ----------
+  function normInv(p){
+    p=Math.min(1-1e-9,Math.max(1e-9,p));
+    const a=[-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00];
+    const b=[-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01];
+    const c=[-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00];
+    const d=[7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
+    const pl=0.02425,ph=1-pl;let q,r;
+    if(p<pl){q=Math.sqrt(-2*Math.log(p));return(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+    if(p<=ph){q=p-0.5;r=q*q;return(((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);}
+    q=Math.sqrt(-2*Math.log(1-p));return-(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+
+  function giniOf(arr){
+    const a=arr.filter(x=>x>0).sort((x,y)=>x-y);const n=a.length;if(n===0)return 0;
+    let cum=0,s=0;for(let i=0;i<n;i++){s+=a[i];cum+=s;}
+    return s===0?0:(n+1-2*cum/s)/n;
+  }
+  function median(arr){const a=arr.slice().sort((x,y)=>x-y);const n=a.length;if(!n)return 0;return n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2;}
+
+  // Atkinson equally-distributed-equivalent on a real sample
+  function edeSample(arr,eta){
+    const a=arr.filter(x=>x>0);const n=a.length;if(!n)return 0;
+    if(Math.abs(eta-1)<1e-6){let s=0;for(const x of a)s+=Math.log(x);return Math.exp(s/n);}
+    let s=0;const p=1-eta;for(const x of a)s+=Math.pow(x,p);
+    const m=s/n;return m<=0?0:Math.pow(m,1/p);
+  }
+
+  const P={redis:0.30,inc:0.45,plan:0.35,eta:1.20,shock:0.30};
+  const BASE_GINI=0.62; // laissez-faire inequality the aggregate model assumes
+
+  // ---------- aggregate frontier model ----------
+  // welfare as a function of redistribution r, given the four knobs
+  function welfare(r){
+    const gini=Math.min(0.97,Math.max(0.02,BASE_GINI*(1-r)));         // pooling compresses spread
+    const pie=Math.max(0,(1-P.inc*r)*(1-P.plan*r));                   // incentives + Hayek shrink the pie
+    const sigma=Math.SQRT2*normInv((gini+1)/2);                       // lognormal spread from gini
+    const ede=pie*Math.exp(-P.eta*sigma*sigma/2);                     // Atkinson EDE per capita
+    const shockLoss=P.shock*(1-r);                                    // pooling insures against shocks
+    return Math.max(0,ede*(1-shockLoss));
+  }
+  function optimum(){
+    let best=-1,br=0;for(let r=0;r<=1.0001;r+=0.005){const w=welfare(r);if(w>best){best=w;br=r;}}
+    return{r:br,w:best};
+  }
+
+  // ---------- agent world ----------
+  const GW=44,GH=44,N=320;
+  const world=document.getElementById('world');
+  const wctx=world.getContext('2d');
+  let cap=new Float32Array(GW*GH), res=new Float32Array(GW*GH);
+  let agents=[];
+  let pool=0; // visual only
+
+  function seedTerrain(){
+    const peaks=[[14,15,9],[30,30,10]];
+    for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){
+      let c=0.4;
+      for(const[px,py,pr]of peaks){const d=Math.hypot(x-px,y-py);c+=4.2*Math.exp(-(d*d)/(2*pr*pr));}
+      cap[y*GW+x]=c;res[y*GW+x]=c*Math.random();
+    }
+  }
+  function spawn(){
+    agents=[];const occ=new Set();
+    for(let i=0;i<N;i++){
+      let x,y,k,tries=0;
+      do{x=(Math.random()*GW)|0;y=(Math.random()*GH)|0;k=y*GW+x;tries++;}while(occ.has(k)&&tries<50);
+      occ.add(k);
+      agents.push({x,y,wealth:2+Math.random()*4,metab:0.55+Math.random()*1.1,vision:1+((Math.random()*4)|0),alive:true,gain:0});
+    }
+  }
+  function reset(){seedTerrain();spawn();pool=0;tick.count=0;draw();computeMetrics();}
+
+  function occMap(){const m=new Int8Array(GW*GH);for(const a of agents)if(a.alive)m[a.y*GW+a.x]=1;return m;}
+
+  function step(){
+    const r=P.redis,effort=Math.max(0,1-P.inc*r);
+    const occ=occMap();
+    // shock?
+    let shockCells=null;
+    if(Math.random()<0.06 && P.shock>0){
+      const cx=(Math.random()*GW)|0,cy=(Math.random()*GH)|0,rad=6+((Math.random()*5)|0);
+      shockCells={cx,cy,rad};
+      for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){if(Math.hypot(x-cx,y-cy)<rad)res[y*GW+x]*=(1-P.shock);}
+    }
+    // move + harvest
+    let pooled=0;
+    for(const a of agents){
+      if(!a.alive)continue;
+      occ[a.y*GW+a.x]=0;
+      let bx=a.x,by=a.y,bv=res[a.y*GW+a.x];
+      for(let dx=-a.vision;dx<=a.vision;dx++){
+        const nx=a.x+dx;if(nx<0||nx>=GW)continue;
+        if(res[a.y*GW+nx]>bv&&!occ[a.y*GW+nx]){bv=res[a.y*GW+nx];bx=nx;by=a.y;}
+      }
+      for(let dy=-a.vision;dy<=a.vision;dy++){
+        const ny=a.y+dy;if(ny<0||ny>=GH)continue;
+        if(res[ny*GW+a.x]>bv&&!occ[ny*GW+a.x]){bv=res[ny*GW+a.x];bx=a.x;by=ny;}
+      }
+      a.x=bx;a.y=by;occ[by*GW+bx]=1;
+      const cell=by*GW+bx;
+      const got=res[cell]*effort;
+      a.gain=got;res[cell]=0;
+      const tax=got*r;pooled+=tax;
+      a.wealth+=got-tax;
+    }
+    // redistribute (minus Hayek waste), evenly
+    const aliveArr=agents.filter(a=>a.alive);
+    const distributable=pooled*(1-P.plan*r);
+    pool=distributable;
+    if(aliveArr.length){const share=distributable/aliveArr.length;for(const a of aliveArr)a.wealth+=share;}
+    // metabolism + shock drain + death
+    for(const a of agents){
+      if(!a.alive)continue;
+      let drain=a.metab;
+      if(shockCells&&Math.hypot(a.x-shockCells.cx,a.y-shockCells.cy)<shockCells.rad)drain+=P.shock*2.0;
+      a.wealth-=drain;
+      if(a.wealth<=0){a.alive=false;a.wealth=0;}
+    }
+    // regrow
+    for(let i=0;i<res.length;i++){res[i]=Math.min(cap[i],res[i]+cap[i]*0.10);}
+    tick.count=(tick.count||0)+1;
+  }
+  function tick(){step();draw();computeMetrics();}
+
+  // ---------- rendering ----------
+  function draw(){
+    const px=world.width/GW;
+    // terrain substrate
+    for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){
+      const f=res[y*GW+x]/5.5;
+      const g=Math.max(0,Math.min(1,f));
+      const v=(10+g*16)|0;
+      wctx.fillStyle='rgb('+(v-2)+','+(v+4)+','+(v+2)+')';
+      wctx.fillRect(x*px,y*px,px,px);
+    }
+    // agents
+    const ws=agents.filter(a=>a.alive).map(a=>a.wealth);
+    const mx=ws.length?Math.max(8,...ws):8;
+    for(const a of agents){
+      if(!a.alive){wctx.fillStyle='#3a1417';wctx.fillRect(a.x*px,a.y*px,px,px);continue;}
+      const t=Math.min(1,a.wealth/mx);
+      // ramp: dim slate -> gold
+      const rr=(34+(224-34)*t)|0, gg=(41+(167-41)*t)|0, bb=(50+(60-50)*t*0.5)|0;
+      wctx.fillStyle='rgb('+rr+','+gg+','+bb+')';
+      wctx.fillRect(a.x*px,a.y*px,px,px);
+    }
+  }
+
+  // frontier chart
+  const fr=document.getElementById('frontier');const fctx=fr.getContext('2d');
+  function drawFrontier(){
+    const W=fr.width,H=fr.height,padL=44,padR=14,padT=14,padB=26;
+    fctx.clearRect(0,0,W,H);
+    const xs=[],ys=[];let wmax=1e-9;
+    for(let r=0;r<=1.0001;r+=0.01){const w=welfare(r);xs.push(r);ys.push(w);if(w>wmax)wmax=w;}
+    const X=r=>padL+(W-padL-padR)*r;
+    const Y=w=>H-padB-(H-padT-padB)*(w/wmax);
+    // grid lines
+    fctx.strokeStyle='#222932';fctx.lineWidth=1;fctx.font='10px '+getMono();
+    fctx.fillStyle='#5d6775';fctx.textAlign='center';
+    for(let r=0;r<=1.001;r+=0.25){fctx.beginPath();fctx.moveTo(X(r),padT);fctx.lineTo(X(r),H-padB);fctx.stroke();fctx.fillText(r.toFixed(2),X(r),H-9);}
+    fctx.save();fctx.translate(12,H/2);fctx.rotate(-Math.PI/2);fctx.fillText('welfare',0,0);fctx.restore();
+    fctx.textAlign='left';fctx.fillText('laissez-faire',padL,11);
+    fctx.textAlign='right';fctx.fillText('central plan',W-padR,11);
+    // current-r marker
+    fctx.strokeStyle='#3a434f';fctx.setLineDash([4,4]);
+    fctx.beginPath();fctx.moveTo(X(P.redis),padT);fctx.lineTo(X(P.redis),H-padB);fctx.stroke();fctx.setLineDash([]);
+    // area + line with gold->crimson gradient
+    const grad=fctx.createLinearGradient(padL,0,W-padR,0);
+    grad.addColorStop(0,'#e0a73c');grad.addColorStop(0.5,'#b07a64');grad.addColorStop(1,'#d3454f');
+    fctx.beginPath();fctx.moveTo(X(xs[0]),Y(ys[0]));
+    for(let i=1;i<xs.length;i++)fctx.lineTo(X(xs[i]),Y(ys[i]));
+    fctx.lineTo(X(1),H-padB);fctx.lineTo(X(0),H-padB);fctx.closePath();
+    fctx.globalAlpha=0.13;fctx.fillStyle=grad;fctx.fill();fctx.globalAlpha=1;
+    fctx.beginPath();fctx.moveTo(X(xs[0]),Y(ys[0]));
+    for(let i=1;i<xs.length;i++)fctx.lineTo(X(xs[i]),Y(ys[i]));
+    fctx.strokeStyle=grad;fctx.lineWidth=2.5;fctx.stroke();
+    // optimum
+    const o=optimum();
+    fctx.fillStyle='#5bbf8a';fctx.beginPath();fctx.arc(X(o.r),Y(o.w),5,0,7);fctx.fill();
+    fctx.strokeStyle='#0e1116';fctx.lineWidth=1.5;fctx.stroke();
+    fctx.fillStyle='#5bbf8a';fctx.textAlign='center';fctx.font='600 11px '+getMono();
+    const lx=Math.min(W-40,Math.max(40,X(o.r)));
+    fctx.fillText('optimum r='+o.r.toFixed(2),lx,Y(o.w)-10);
+    return o;
+  }
+  function getMono(){return 'ui-monospace, "SF Mono", Menlo, monospace';}
+
+  function classify(r){
+    if(r<0.18)return['Laissez-faire markets','mkt'];
+    if(r<0.62)return['A mixed economy','mix'];
+    return['Central planning','plan'];
+  }
+
+  function updateVerdict(o){
+    const[label,cls]=classify(o.r);
+    const v=document.getElementById('verdict');
+    let why;
+    if(o.r<0.18)why='Your incentive and Hayek penalties are steep enough that pooling destroys more pie than equality is worth — the command-economy outcome.';
+    else if(o.r<0.62)why='Markets generate the surplus; partial redistribution converts it into welfare faster than it suppresses output. The Nordic configuration, and where most of the parameter space lands.';
+    else why='With effort barely sensitive to ownership, low planner waste, severe shocks, and steep inequality aversion, pooling dominates. Note how narrow that corner of assumption-space is.';
+    v.innerHTML='Given your assumptions, welfare peaks at <b>r = '+o.r.toFixed(2)+'</b> &nbsp;<span class="tag '+cls+'">'+label+'</span><br><span style="color:var(--ink-dim);font-size:12.5px">'+why+'</span>';
+  }
+
+  function computeMetrics(){
+    const alive=agents.filter(a=>a.alive);
+    const ws=alive.map(a=>a.wealth);
+    const out=ws.reduce((s,x)=>s+x,0);
+    document.getElementById('m-out').textContent=out.toFixed(0);
+    document.getElementById('m-med').textContent=median(ws).toFixed(1);
+    document.getElementById('m-gini').textContent=giniOf(ws).toFixed(3);
+    document.getElementById('m-surv').textContent=alive.length+' / '+N;
+    document.getElementById('m-welf').textContent=edeSample(ws,P.eta).toFixed(2);
+  }
+
+  function refreshModel(){const o=drawFrontier();updateVerdict(o);}
+
+  // ---------- wiring ----------
+  function bind(id,key,fmt){
+    const el=document.getElementById(id),out=document.getElementById('v-'+key.replace('redis','redis'));
+    const lbl={inc:'v-inc',plan:'v-plan',eta:'v-eta',shock:'v-shock',redis:'v-redis'}[key];
+    const label=document.getElementById(lbl);
+    el.addEventListener('input',()=>{P[key]=parseFloat(el.value);label.textContent=fmt(P[key]);refreshModel();});
+  }
+  bind('redis','redis',v=>v.toFixed(2));
+  bind('inc','inc',v=>v.toFixed(2));
+  bind('plan','plan',v=>v.toFixed(2));
+  bind('eta','eta',v=>v.toFixed(2));
+  bind('shock','shock',v=>v.toFixed(2));
+
+  let timer=null;const runBtn=document.getElementById('run');
+  function setRunning(on){
+    if(on){runBtn.textContent='Pause';runBtn.dataset.running='true';timer=setInterval(tick,90);}
+    else{runBtn.textContent='Run';runBtn.dataset.running='false';if(timer)clearInterval(timer);timer=null;}
+  }
+  runBtn.addEventListener('click',()=>setRunning(!timer));
+  document.getElementById('step').addEventListener('click',()=>{if(timer)setRunning(false);tick();});
+  document.getElementById('reset').addEventListener('click',()=>{reset();});
+  document.getElementById('jump').addEventListener('click',()=>{
+    const o=optimum();P.redis=o.r;document.getElementById('redis').value=o.r;
+    document.getElementById('v-redis').textContent=o.r.toFixed(2);refreshModel();
+  });
+
+  reset();
+  refreshModel();
+})();
+</script>
+
+
+</body></html>
