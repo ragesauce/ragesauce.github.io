@@ -27,3 +27,7 @@
   justify-content: center;
   gap: 8px;
 }
+
+.donations .btn {
+  margin-bottom: 20px;
+}
