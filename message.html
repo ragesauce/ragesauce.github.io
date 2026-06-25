@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seal · encrypt to a PGP key</title>
+<style>
+  :root{
+    --bg:#0a0d13;
+    --bg2:#0e131b;
+    --panel:#0d1119;
+    --line:#1d2530;
+    --line-2:#28323f;
+    --ink:#e7e3d8;
+    --ink-dim:#8b8a7e;
+    --ink-faint:#5c6066;
+    --amber:#e3a93b;        /* key material — the crypto voice */
+    --amber-deep:#a8782a;
+    --cyan:#54d6c8;         /* the seal action, reserved */
+    --cyan-deep:#2f8d83;
+    --danger:#e0683c;
+    --ok:#7bc488;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{padding:26px 20px 60px;max-width:840px;margin:0 auto}
+
+  /* armor-rule motif: structure that means something (PGP ascii armor framing) */
+  .armor{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-faint);user-select:none;white-space:nowrap;overflow:hidden}
+
+  header{margin-bottom:22px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--amber-deep)}
+  h1{margin:.3em 0 .2em;font-size:30px;font-weight:680;letter-spacing:-.015em}
+  h1 .lock{color:var(--cyan)}
+  .lede{color:var(--ink-dim);font-size:14px;line-height:1.55;max-width:64ch}
+
+  .section{margin-top:24px}
+  .label-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .label{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);font-weight:600}
+  .label .you{color:var(--amber)}
+  .note{font-size:11.5px;color:var(--ink-faint);font-family:var(--mono)}
+  .note button{font:inherit;color:var(--cyan);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+
+  textarea{
+    width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:9px;
+    color:var(--ink);font-family:var(--mono);font-size:12.5px;line-height:1.5;padding:13px 14px;
+    resize:vertical;outline:none;transition:border-color .14s,box-shadow .14s;
+  }
+  textarea:focus{border-color:var(--line-2);box-shadow:0 0 0 3px rgba(84,214,200,.12)}
+  textarea.key{min-height:148px;color:#d9c79a}
+  textarea.msg{min-height:104px}
+  textarea.out{min-height:148px;color:var(--amber);background:#0b0f08}
+  textarea.out:focus{box-shadow:0 0 0 3px rgba(227,169,59,.14)}
+
+  /* key dossier — the signature element */
+  .dossier{
+    margin-top:10px;border:1px solid var(--line);border-radius:9px;overflow:hidden;
+    background:linear-gradient(180deg,#0c1118,#0b0e14);
+  }
+  .dossier .bar{display:flex;align-items:center;gap:9px;padding:9px 13px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:.06em}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .dot.ok{background:var(--ok);box-shadow:0 0 8px rgba(123,196,136,.6)}
+  .dot.bad{background:var(--danger);box-shadow:0 0 8px rgba(224,104,60,.5)}
+  .dossier .status{color:var(--ink-dim)}
+  .dossier .body{padding:13px;display:none;grid-template-columns:auto 1fr;gap:7px 16px;font-family:var(--mono);font-size:12px}
+  .dossier.live .body{display:grid}
+  .dossier .k{color:var(--ink-faint);letter-spacing:.08em;text-transform:uppercase;font-size:10.5px;align-self:center}
+  .dossier .v{color:var(--ink);word-break:break-all}
+  .fpr{color:var(--amber);font-size:13px;letter-spacing:.06em}
+  .verify{grid-column:1/-1;margin-top:4px;padding-top:10px;border-top:1px dashed var(--line-2);color:var(--ink-faint);font-size:11px;line-height:1.5}
+
+  .actions{display:flex;gap:11px;align-items:center;margin-top:18px;flex-wrap:wrap}
+  .seal{
+    font-family:var(--sans);font-size:14px;font-weight:620;letter-spacing:.01em;
+    color:#04201d;background:var(--cyan);border:1px solid var(--cyan);border-radius:9px;
+    padding:11px 22px;cursor:pointer;transition:transform .1s,filter .14s,opacity .14s;
+  }
+  .seal:hover{filter:brightness(1.08)}
+  .seal:active{transform:translateY(1px)}
+  .seal:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4)}
+  .seal:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+  .ghost{
+    font-family:var(--sans);font-size:13px;font-weight:550;color:var(--ink);
+    background:transparent;border:1px solid var(--line-2);border-radius:9px;padding:10px 15px;cursor:pointer;transition:border-color .14s
+  }
+  .ghost:hover{border-color:var(--ink-faint)}
+  .ghost:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+  .msg-status{font-family:var(--mono);font-size:12px;color:var(--ink-dim);min-height:1.2em}
+  .msg-status.err{color:var(--danger)}
+  .msg-status.ok{color:var(--ok)}
+
+  .outwrap{margin-top:22px;display:none}
+  .outwrap.show{display:block}
+
+  footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);color:var(--ink-faint);font-size:11.5px;line-height:1.6}
+  footer b{color:var(--ink-dim)}
+  code{font-family:var(--mono);color:var(--amber-deep)}
+
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+  @media(max-width:560px){h1{font-size:24px}.dossier .body{grid-template-columns:1fr}.dossier .k{margin-top:6px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="armor">────────[ BEGIN PGP MESSAGE ]────────────────────────────────</div>
+  <div class="eyebrow">ascii-armored · curve25519 · client-side</div>
+  <h1>Seal <span class="lock">&#128274;</span></h1>
+  <p class="lede">Type a message, encrypt it to a public key, get back an armored block only the holder of the matching private key can open. Everything runs in this page — no key, no plaintext, and no ciphertext ever leaves your browser.</p>
+</header>
+
+<!-- KEY -->
+<div class="section">
+  <div class="label-row">
+    <span class="label">Recipient key &mdash; <span class="you">ragesauce</span>, by default</span>
+    <span class="note">Editable. <button id="restore" type="button">Restore mine</button> · paste any other public key to encrypt to someone else.</span>
+  </div>
+  <textarea class="key" id="key" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+
+  <div class="dossier" id="dossier">
+    <div class="bar"><span class="dot" id="dot"></span><span class="status" id="kstatus">Reading key&hellip;</span></div>
+    <div class="body" id="kbody">
+      <div class="k">Owner</div><div class="v" id="d-uid">—</div>
+      <div class="k">Algorithm</div><div class="v" id="d-alg">—</div>
+      <div class="k">Key ID</div><div class="v" id="d-id">—</div>
+      <div class="k">Created</div><div class="v" id="d-date">—</div>
+      <div class="k">Fingerprint</div><div class="v fpr" id="d-fpr">—</div>
+      <div class="verify">Verify this fingerprint against the owner through a separate channel (in person, signed message, phone) before you trust it. The armor is only as good as your confidence that the key is really theirs.</div>
+    </div>
+  </div>
+</div>
+
+<!-- MESSAGE -->
+<div class="section">
+  <div class="label-row">
+    <span class="label">Message</span>
+    <span class="note" id="charcount">0 chars</span>
+  </div>
+  <textarea class="msg" id="msg" placeholder="Plaintext goes here. It never leaves this tab." spellcheck="false"></textarea>
+</div>
+
+<div class="actions">
+  <button class="seal" id="seal" disabled>Encrypt &amp; seal</button>
+  <button class="ghost" id="clear" type="button">Clear</button>
+  <span class="msg-status" id="status"></span>
+</div>
+
+<!-- OUTPUT -->
+<div class="outwrap" id="outwrap">
+  <div class="section">
+    <div class="label-row">
+      <span class="label">Armored ciphertext</span>
+      <span class="note"><button id="copy" type="button">Copy block</button></span>
+    </div>
+    <textarea class="out" id="out" readonly spellcheck="false"></textarea>
+  </div>
+</div>
+
+<footer>
+  <b>What this does &amp; doesn't.</b> It encrypts for confidentiality — the recipient decrypts with their private key. It does <i>not</i> sign, so it carries no proof of who wrote it (signing needs your private key, which has no business being pasted into a web page). Decrypt with <code>gpg -d</code>, or any OpenPGP client.<br><br>
+  <b>Trust model.</b> Encryption is computed locally via OpenPGP.js. No network calls are made with your data. The library itself loads from a public CDN; for true air-gapped use, save this file and vendor the script locally. Crypto is only as strong as your verification that the key belongs to who you think it does — hence the fingerprint above.
+  <div class="armor" style="margin-top:14px">────────[ END PGP MESSAGE ]──────────────────────────────────</div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  const DEFAULT_KEY = `-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEaf47ohYJKwYBBAHaRw8BAQdAXL2DiaL1kLKNxTgFbC43asrfvcsj4hLxXmYp
+NQCSgc60CV8gPHhAeS56PoiTBBMWCgA7FiEEwzC4hJSKCxOJ7I6Q0zBJapcsCuoF
+Amn+O6ICGwMFCwkIBwICIgIGFQoJCAsCBBYCAwECHgcCF4AACgkQ0zBJapcsCupC
+BgD+KPlOtcNqmIN6IM9plt7r7Jqhsje7pvJHqYtNV3NPGDUBAJ2wp4YkETRKP15P
+auyRTSRVWmsSG7S/mMhr16G2aXIAuDgEaf47ohIKKwYBBAGXVQEFAQEHQEzdNUyH
+BZaLPq7cvGBxc63tjXTvFYtJCC/Igpm+VaJuAwEIB4h4BBgWCgAgFiEEwzC4hJSK
+CxOJ7I6Q0zBJapcsCuoFAmn+O6ICGwwACgkQ0zBJapcsCur5AAEAuhNRBCz8FksD
+hCfub7XYHaerugkIHdr/qZi6GzVzYlQBAMvvPsa0RuA4FMw8LGhhM1EQzCGVxhuz
+9l8MW8xAJW4M
+=+atF
+-----END PGP PUBLIC KEY BLOCK-----`;
+
+  const $ = id => document.getElementById(id);
+  const keyEl=$('key'), msgEl=$('msg'), sealBtn=$('seal'), statusEl=$('status'),
+        dossier=$('dossier'), dot=$('dot'), kstatus=$('kstatus'),
+        outwrap=$('outwrap'), outEl=$('out');
+
+  keyEl.value = DEFAULT_KEY;
+
+  // ---- load OpenPGP.js with multi-CDN / multi-version fallback ----
+  const SOURCES = [
+    "https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.2/openpgp.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.1/openpgp.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/openpgp/6.1.0/openpgp.min.js",
+    "https://cdn.jsdelivr.net/npm/openpgp@5/dist/openpgp.min.js",
+    "https://cdn.jsdelivr.net/npm/openpgp@6/dist/openpgp.min.js",
+    "https://unpkg.com/openpgp@5/dist/openpgp.min.js"
+  ];
+  let pgpReady=false;
+  function loadSeq(i){
+    return new Promise((res,rej)=>{
+      if(i>=SOURCES.length){rej(new Error("could not load OpenPGP.js"));return;}
+      const s=document.createElement('script');
+      s.src=SOURCES[i]; s.async=true;
+      s.onload=()=>{ window.openpgp ? res() : (s.remove(), loadSeq(i+1).then(res,rej)); };
+      s.onerror=()=>{ s.remove(); loadSeq(i+1).then(res,rej); };
+      document.head.appendChild(s);
+    });
+  }
+
+  loadSeq(0).then(()=>{
+    pgpReady=true;
+    refreshKey();
+  }).catch(()=>{
+    setDot('bad','Couldn\u2019t load the crypto library — check your connection, or vendor the script locally.');
+    statusEl.textContent='Crypto engine unavailable.';
+    statusEl.className='msg-status err';
+  });
+
+  // ---- key parsing / dossier ----
+  function setDot(state,text){
+    dot.className='dot'+(state?(' '+state):'');
+    kstatus.textContent=text;
+  }
+  function fmtFingerprint(fp){
+    const hex=(fp||'').toUpperCase();
+    const groups=hex.match(/.{1,4}/g)||[];
+    // two rows of 5 groups, classic gpg layout
+    return groups.slice(0,5).join(' ') + (groups.length>5 ? '\n'+groups.slice(5).join(' ') : '');
+  }
+  let parsedKey=null;
+  let parseToken=0;
+
+  async function refreshKey(){
+    if(!pgpReady) return;
+    const armored=keyEl.value.trim();
+    const token=++parseToken;
+    parsedKey=null;
+    dossier.classList.remove('live');
+    if(!armored){ setDot('','No key. Paste a PGP public key block.'); updateSeal(); return; }
+    setDot('','Reading key\u2026');
+    try{
+      const key=await openpgp.readKey({armoredKey:armored});
+      if(token!==parseToken) return; // superseded
+      // pull metadata defensively across v5/v6
+      let uid='(no user ID)', alg='—', kid='—', created='—', fpr='—';
+      try{ const ids=key.getUserIDs(); if(ids&&ids.length) uid=ids[0]; }catch(e){}
+      try{
+        const ai=key.getAlgorithmInfo();
+        alg=(ai.algorithm||'').replace(/_/g,' ');
+        if(ai.curve) alg+=' · '+ai.curve;
+        else if(ai.bits) alg+=' · '+ai.bits+'-bit';
+      }catch(e){}
+      try{ kid=key.getKeyID().toHex().toUpperCase(); }catch(e){}
+      try{ const d=key.getCreationTime(); if(d) created=d.toISOString().slice(0,10); }catch(e){}
+      try{ fpr=fmtFingerprint(key.getFingerprint()); }catch(e){}
+
+      // confirm it can actually encrypt
+      let encOk=true;
+      try{ await key.getEncryptionKey(); }catch(e){ encOk=false; }
+
+      $('d-uid').textContent=uid;
+      $('d-alg').textContent=alg;
+      $('d-id').textContent=kid;
+      $('d-date').textContent=created;
+      $('d-fpr').textContent=fpr;
+      dossier.classList.add('live');
+
+      if(encOk){
+        parsedKey=key;
+        setDot('ok','Valid public key · ready to encrypt');
+      }else{
+        setDot('bad','Key parsed, but it has no encryption-capable (sub)key.');
+      }
+    }catch(err){
+      if(token!==parseToken) return;
+      dossier.classList.remove('live');
+      setDot('bad','Not a readable PGP public key. '+(err&&err.message?err.message:''));
+    }
+    updateSeal();
+  }
+
+  function updateSeal(){
+    sealBtn.disabled = !(pgpReady && parsedKey && msgEl.value.length>0);
+  }
+
+  // ---- encrypt ----
+  async function seal(){
+    if(sealBtn.disabled) return;
+    statusEl.className='msg-status'; statusEl.textContent='Encrypting\u2026';
+    sealBtn.disabled=true;
+    try{
+      const message=await openpgp.createMessage({text:msgEl.value});
+      const armored=await openpgp.encrypt({message, encryptionKeys:parsedKey});
+      outEl.value=armored;
+      outwrap.classList.add('show');
+      statusEl.className='msg-status ok';
+      statusEl.textContent='Sealed. '+armored.length+' bytes of armor.';
+      outwrap.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }catch(err){
+      statusEl.className='msg-status err';
+      statusEl.textContent='Encryption failed: '+(err&&err.message?err.message:'unknown error');
+    }finally{
+      updateSeal();
+    }
+  }
+
+  // ---- copy ----
+  async function copyOut(){
+    const note=$('copy');
+    try{
+      await navigator.clipboard.writeText(outEl.value);
+      const t=note.textContent; note.textContent='Copied'; setTimeout(()=>note.textContent=t,1400);
+    }catch(e){
+      outEl.select(); document.execCommand&&document.execCommand('copy');
+    }
+  }
+
+  // ---- wiring ----
+  let kTimer=null;
+  keyEl.addEventListener('input',()=>{ clearTimeout(kTimer); kTimer=setTimeout(refreshKey,250); });
+  msgEl.addEventListener('input',()=>{ $('charcount').textContent=msgEl.value.length+' chars'; updateSeal(); });
+  sealBtn.addEventListener('click',seal);
+  $('copy').addEventListener('click',copyOut);
+  $('restore').addEventListener('click',()=>{ keyEl.value=DEFAULT_KEY; refreshKey(); });
+  $('clear').addEventListener('click',()=>{
+    msgEl.value=''; outEl.value=''; outwrap.classList.remove('show');
+    $('charcount').textContent='0 chars'; statusEl.textContent=''; statusEl.className='msg-status'; updateSeal(); msgEl.focus();
+  });
+  // ctrl/cmd+enter to seal
+  msgEl.addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='Enter') seal(); });
+
+  setDot('','Loading crypto engine\u2026');
+})();
+</script>
+</body>
+</html>
