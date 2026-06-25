@@ -21,3 +21,9 @@
 .mainImage {
 	width: 40%;
 }
+
+.donations {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
